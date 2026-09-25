@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise Spam & Abuse Detection Engine</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-base: #090d16;
+      --bg-surface: #111827;
+      --bg-surface-elevated: #1f2937;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --text-main: #f9fafb;
+      --text-muted: #9ca3af;
+      --border: #374151;
+      --spam-color: #ef4444;
+      --ham-color: #10b981;
+      --suspect-color: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .dashboard {
+      max-width: 1440px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 24px;
+    }
+
+    .panel {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .header-title {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-title h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    /* Form & Input Controls */
+    .control-group {
+      margin-bottom: 16px;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .input-field, textarea {
+      width: 100%;
+      background-color: var(--bg-base);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus, textarea:focus {
+      border-color: var(--primary);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 140px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+
+    .btn {
+      width: 100%;
+      background-color: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--primary-hover);
+    }
+
+    /* Main Grid & Visualizations */
+    .main-content {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .metrics-row {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .metric-card {
+      background-color: var(--bg-surface-elevated);
+      padding: 16px;
+      border-radius: 8px;
+      border-left: 4px solid var(--primary);
+    }
+
+    .metric-card.spam { border-left-color: var(--spam-color); }
+    .metric-card.ham { border-left-color: var(--ham-color); }
+    .metric-card.suspect { border-left-color: var(--suspect-color); }
+
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+
+    .chart-card {
+      min-height: 280px;
+    }
+
+    /* Diagnostic Analysis Terminal */
+    .diagnostic-panel {
+      grid-column: 1 / -1;
+    }
+
+    .token-wrapper {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 12px;
+      background: var(--bg-base);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .token {
+      font-size: 0.8rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: monospace;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border);
+    }
+
+    .token.spam-trigger {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--spam-color);
+      color: #fca5a5;
+    }
+
+    /* Logs Table */
+    .feed-card {
+      grid-column: 1 / -1;
+      max-height: 350px;
+      overflow-y: auto;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    .data-table th, .data-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .data-table th {
+      color: var(--text-muted);
+      background-color: var(--bg-surface-elevated);
+      position: sticky;
+      top: 0;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+      display: inline-block;
+    }
+
+    .badge-spam { background-color: rgba(239, 68, 68, 0.2); color: var(--spam-color); }
+    .badge-ham { background-color: rgba(16, 185, 129, 0.2); color: var(--ham-color); }
+    .badge-suspect { background-color: rgba(245, 158, 11, 0.2); color: var(--suspect-color); }
+
+    .loader {
+      display: none;
+      text-align: center;
+      margin-top: 8px;
+      font-size: 0.8rem;
+      color: var(--primary);
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard { grid-template-columns: 1fr; }
+      .main-content { grid-template-columns: 1fr; }
+      .metrics-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="dashboard">
+  
+  <div class="header-title">
+    <div>
+      <h1>Anti-Spam Inference Engine</h1>
+      <p style="font-size: 0.85rem; color: var(--text-muted)">Naive Bayes Classifier & Metadata Risk Engine</p>
+    </div>
+    <span class="badge badge-ham" style="font-size: 0.85rem">Status: Active Inspection</span>
+  </div>
+
+  <!-- Sidebar Controls -->
+  <aside class="panel">
+    <h3 style="margin-bottom: 15px;">Payload Inspection</h3>
+    
+    <div class="control-group">
+      <label>Sender Address / IP</label>
+      <input type="text" id="senderInput" class="input-field" value="promo-offers@unverified-domain.com">
+    </div>
+
+    <div class="control-group">
+      <label>Message Subject</label>
+      <input type="text" id="subjectInput" class="input-field" value="URGENT: Claim your $1000 gift card now!">
+    </div>
+
+    <div class="control-group">
+      <label>Message Body Payload</label>
+      <textarea id="bodyInput">Congratulations! You have been selected to win a free prize. Click the link below immediately to claim your cash bonus before it expires. Guaranteed transfer!</textarea>
+    </div>
+
+    <button class="btn" id="analyzeBtn" onclick="processPayload()">Scan Payload</button>
+    <div class="loader" id="loader">Extracting Features & Computing Probabilities...</div>
+  </aside>
+
+  <!-- Main Analytics Display -->
+  <main class="main-content">
+
+    <!-- Metrics Header -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-label">Processed Payloads</div>
+        <div class="metric-value" id="totalScanned">0</div>
+      </div>
+      <div class="metric-card spam">
+        <div class="metric-label">Spam Blocked</div>
+        <div class="metric-value" id="spamCount">0</div>
+      </div>
+      <div class="metric-card ham">
+        <div class="metric-label">Legitimate (Ham)</div>
+        <div class="metric-value" id="hamCount">0</div>
+      </div>
+      <div class="metric-card suspect">
+        <div class="metric-label">Suspicious Risk Rate</div>
+        <div class="metric-value" id="riskRate">0%</div>
+      </div>
+    </div>
+
+    <!-- Real-time Classifier Metrics -->
+    <div class="panel chart-card">
+      <h3>Classification Probability Ratio</h3>
+      <canvas id="gaugeChart"></canvas>
+    </div>
+
+    <!-- Feature Weight Distribution -->
+    <div class="panel chart-card">
+      <h3>Top Vector Risk Weights</h3>
+      <canvas id="barChart"></canvas>
+    </div>
+
+    <!-- Token Extraction & Feature Diagnostic Engine -->
+    <div class="panel diagnostic-panel">
+      <h3>Token Extraction & Feature Flags</h3>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px;">Tokenized NLP breakdown with suspicious vectors highlighted:</p>
+      <div class="token-wrapper" id="tokenDisplay">
+        <span style="color: var(--text-muted); font-size: 0.85rem;">Run inspection to view feature extraction...</span>
+      </div>
+    </div>
+
+    <!-- Historical Inspection Log -->
+    <div class="panel feed-card">
+      <h3 style="margin-bottom: 12px;">Inspection Audit Log</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Sender</th>
+            <th>Risk Score</th>
+            <th>Classification</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="logStream">
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // High-risk spam token weighted dictionary (Simulated Naive Bayes Log-Odds)
+  const spamLexicon = {
+    'free': 2.8, 'win': 3.1, 'winner': 3.2, 'cash': 2.5, 'prize': 2.9, 'urgent': 2.4,
+    'claim': 2.7, 'bonus': 2.3, 'guaranteed': 2.6, 'click': 2.1, 'money': 2.2,
+    '100%': 2.5, 'immediately': 2.0, 'credit': 1.8, 'transfer': 1.9, 'offer': 1.5
+  };
+
+  // Mock Pre-loaded Historical Records
+  const historicalLogs = [
+    { time: '10:42:15', sender: 'notifications@github.com', score: 0.04, class: 'Ham', action: 'Delivered' },
+    { time: '10:39:01', sender: 'wire-transfer@crypto-vault-sec.io', score: 0.96, class: 'Spam', action: 'Quarantined' },
+    { time: '10:35:22', sender: 'billing@aws.amazon.com', score: 0.08, class: 'Ham', action: 'Delivered' },
+    { time: '10:30:10', sender: 'marketing@discount-deals.net', score: 0.74, class: 'Suspect', action: 'Flagged' }
+  ];
+
+  let totalScanned = historicalLogs.length;
+  let spamCount = historicalLogs.filter(l => l.class === 'Spam').length;
+  let hamCount = historicalLogs.filter(l => l.class === 'Ham').length;
+
+  let gaugeChartInstance = null;
+  let barChartInstance = null;
+
+  function initCharts() {
+    const ctxGauge = document.getElementById('gaugeChart').getContext('2d');
+    gaugeChartInstance = new Chart(ctxGauge, {
+      type: 'doughnut',
+      data: {
+        labels: ['Spam Probability', 'Ham Confidence'],
+        datasets: [{
+          data: [0, 100],
+          backgroundColor: ['#ef4444', '#10b981'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f9fafb' } } }
+      }
+    });
+
+    const ctxBar = document.getElementById('barChart').getContext('2d');
+    barChartInstance = new Chart(ctxBar, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{
+          label: 'Inference Log-Odds Weight',
+          data: [],
+          backgroundColor: '#6366f1',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { ticks: { color: '#9ca3af' }, grid: { display: false } },
+          y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+  }
+
+  // Naive Bayes Probability & Metadata Risk Estimation Algorithm
+  function evaluateSpamRisk(sender, subject, body) {
+    const text = `${subject} ${body}`.toLowerCase();
+    const tokens = text.match(/\b[a-z0-9%$]+\b/g) || [];
+    
+    let spamScoreSum = 0;
+    const triggeredTokens = {};
+
+    tokens.forEach(token => {
+      if (spamLexicon[token]) {
+        spamScoreSum += spamLexicon[token];
+        triggeredTokens[token] = spamLexicon[token];
+      }
+    });
+
+    // Metadata Heuristics
+    let metadataRisk = 0;
+    if (sender.includes('unverified') || sender.includes('deal') || !sender.includes('.com')) metadataRisk += 1.5;
+    if (subject.toUpperCase() === subject && subject.length > 5) metadataRisk += 1.2; // All Caps Subject
+    if ((text.match(/!/g) || []).length > 2) metadataRisk += 0.8; // Exclamation count
+
+    // Sigmoid Transformation to map score between 0.0 and 1.0
+    const totalScore = spamScoreSum + metadataRisk;
+    const probability = 1 / (1 + Math.exp(-(totalScore - 3)));
+
+    return {
+      probability: parseFloat(probability.toFixed(3)),
+      tokens: tokens,
+      triggeredTokens: triggeredTokens
+    };
+  }
+
+  function processPayload() {
+    const loader = document.getElementById('loader');
+    loader.style.display = 'block';
+
+    const sender = document.getElementById('senderInput').value;
+    const subject = document.getElementById('subjectInput').value;
+    const body = document.getElementById('bodyInput').value;
+
+    setTimeout(() => {
+      const result = evaluateSpamRisk(sender, subject, body);
+      const prob = result.probability;
+      const spamPercentage = Math.round(prob * 100);
+      const hamPercentage = 100 - spamPercentage;
+
+      // Classification Mapping
+      let classification = 'Ham';
+      let badgeClass = 'badge-ham';
+      let action = 'Delivered';
+
+      if (prob >= 0.75) {
+        classification = 'Spam';
+        badgeClass = 'badge-spam';
+        action = 'Quarantined';
+        spamCount++;
+      } else if (prob >= 0.45) {
+        classification = 'Suspect';
+        badgeClass = 'badge-suspect';
+        action = 'Flagged';
+      } else {
+        hamCount++;
+      }
+
+      totalScanned++;
+
+      // Update Header Metrics
+      document.getElementById('totalScanned').textContent = totalScanned;
+      document.getElementById('spamCount').textContent = spamCount;
+      document.getElementById('hamCount').textContent = hamCount;
+      document.getElementById('riskRate').textContent = `${Math.round((spamCount / totalScanned) * 100)}%`;
+
+      // Update Gauge Chart
+      gaugeChartInstance.data.datasets[0].data = [spamPercentage, hamPercentage];
+      gaugeChartInstance.update();
+
+      // Update Bar Chart (Top Triggered Risk Weights)
+      const labels = Object.keys(result.triggeredTokens);
+      const weights = Object.values(result.triggeredTokens);
+      barChartInstance.data.labels = labels.length ? labels : ['No Suspicious Vectors'];
+      barChartInstance.data.datasets[0].data = weights.length ? weights : [0];
+      barChartInstance.update();
+
+      // Render Token Diagnostic Chips
+      const tokenContainer = document.getElementById('tokenDisplay');
+      tokenContainer.innerHTML = '';
+      result.tokens.forEach(t => {
+        const span = document.createElement('span');
+        const isSpam = result.triggeredTokens[t];
+        span.className = `token ${isSpam ? 'spam-trigger' : ''}`;
+        span.textContent = isSpam ? `${t} (${result.triggeredTokens[t]})` : t;
+        tokenContainer.appendChild(span);
+      });
+
+      // Update Logs Stream
+      const tbody = document.getElementById('logStream');
+      const timeStr = new Date().toLocaleTimeString();
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${timeStr}</td>
+        <td>${sender}</td>
+        <td>${prob}</td>
+        <td><span class="badge ${badgeClass}">${classification}</span></td>
+        <td>${action}</td>
+      `;
+      tbody.insertBefore(row, tbody.firstChild);
+
+      loader.style.display = 'none';
+    }, 400);
+  }
+
+  function renderInitialLogs() {
+    const tbody = document.getElementById('logStream');
+    historicalLogs.forEach(log => {
+      let badgeClass = log.class === 'Spam' ? 'badge-spam' : (log.class === 'Suspect' ? 'badge-suspect' : 'badge-ham');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${log.time}</td>
+        <td>${log.sender}</td>
+        <td>${log.score}</td>
+        <td><span class="badge ${badgeClass}">${log.class}</span></td>
+        <td>${log.action}</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    document.getElementById('totalScanned').textContent = totalScanned;
+    document.getElementById('spamCount').textContent = spamCount;
+    document.getElementById('hamCount').textContent = hamCount;
+    document.getElementById('riskRate').textContent = `${Math.round((spamCount / totalScanned) * 100)}%`;
+  }
+
+  window.onload = () => {
+    initCharts();
+    renderInitialLogs();
+    processPayload();
+  };
+</script>
+</body>
+</html>
